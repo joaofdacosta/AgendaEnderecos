@@ -11,8 +11,10 @@ import jakarta.xml.bind.annotation.XmlRootElement;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.io.StringReader;
+import java.util.Date;
 
 @Getter
 @Setter
@@ -20,12 +22,11 @@ import java.io.StringReader;
 @ToString
 @XmlRootElement(name = "xmlcep")
 @XmlAccessorType(XmlAccessType.FIELD)
-
 public class Endereco {
 
-    @Id //anotacao para chave primaria
-    @GeneratedValue(strategy = GenerationType.IDENTITY) //anotacao
-    private Long id;  //chave primaria
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
     private String cep;
     private String logradouro;
     private String complemento;
@@ -33,14 +34,18 @@ public class Endereco {
     private String localidade;
     private String uf;
 
+    //campo para data e hora
+    @CreationTimestamp
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date dataRegistro;
+
     @ManyToOne
     private Cliente clientes;
 
     public static Endereco unmarshalFromString(String xml) throws JAXBException {
-        JAXBContext context = JAXBContext.newInstance(Endereco.class); //cria o contexto
-        Unmarshaller unmarshaller = context.createUnmarshaller(); //objeto que faz a conversão
-        StringReader reader = new StringReader(xml); //lê a string
-        return (Endereco) unmarshaller.unmarshal(reader); //converte a string em objeto e retorna
+        JAXBContext context = JAXBContext.newInstance(Endereco.class);
+        Unmarshaller unmarshaller = context.createUnmarshaller();
+        StringReader reader = new StringReader(xml);
+        return (Endereco) unmarshaller.unmarshal(reader);
     }
-
 }

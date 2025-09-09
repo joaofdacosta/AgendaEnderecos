@@ -13,23 +13,16 @@ import jakarta.xml.bind.JAXBException;
 import java.io.IOException;
 import java.util.Date;
 import java.util.List;
+import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) throws IOException, JAXBException {
         EntityManagerUtil.getEmf();
+        Scanner scanner = new Scanner(System.in);
 
-        String cepParaBuscar = "85805020";
-        Endereco endereco;
-
-        // Crie uma nova instância de EntityManager para a busca
-        EntityManager emBusca = EntityManagerUtil.getEm();
-        EnderecoDAO enderecoDAOBusca = new EnderecoDAO(emBusca);
-        List<Endereco> enderecosExistentes = enderecoDAOBusca.findByCep(cepParaBuscar);
-
-        // Feche o EntityManager da busca, pois não será mais usado
-        if (emBusca.isOpen()) {
-            emBusca.close();
-        }
+        //Pede o CEP do usuário
+        System.out.println("Por favor, digite o CEP:");
+        String cepParaBuscar = scanner.nextLine();
 
         EntityManager em = EntityManagerUtil.getEm();
         EntityTransaction transaction = em.getTransaction();
@@ -37,40 +30,67 @@ public class Main {
         try {
             transaction.begin();
 
+            Endereco endereco;
+
+            //Consulta o CEP no banco de dados
+            EnderecoDAO enderecoDAO = new EnderecoDAO(em);
+            List<Endereco> enderecosExistentes = enderecoDAO.findByCep(cepParaBuscar);
+
             if (!enderecosExistentes.isEmpty()) {
-                // Se o CEP já existe, anexe a entidade à nova transação
-                endereco = em.merge(enderecosExistentes.get(0));
-                System.out.println("CEP " + cepParaBuscar + " encontrado no banco de dados. Cliente será associado a este endereço.");
+                // Se o CEP existe, use o endereço encontrado
+                endereco = enderecosExistentes.get(0);
+                System.out.println("Endereço com o CEP " + cepParaBuscar + " encontrado no banco de dados.");
             } else {
+                // Se o CEP não existe, busque na API do ViaCEP
+                System.out.println("CEP não encontrado no banco. Buscando na API do ViaCEP...");
                 ViaCepService viaCepService = new ViaCepService();
                 endereco = viaCepService.buscarCep(cepParaBuscar);
+
+                // Exibe o endereço encontrado antes de salvar
+                System.out.println("Endereço encontrado na API: " + endereco.getLogradouro() + ", " + endereco.getBairro() + " - " + endereco.getLocalidade() + "/" + endereco.getUf());
+
+                // Grava o novo endereço no banco.
                 em.persist(endereco);
-                System.out.println("CEP " + cepParaBuscar + " buscado na API e preparado para gravação.");
+                System.out.println("✅ Novo endereço preparado para gravação no banco de dados.");
             }
 
-            Cliente cliente = new Cliente();
-            cliente.setNome("Quarto Cliente"); // Altere o nome para testar
-            cliente.setEmail("quarto.cliente@email.com");
-            cliente.setDataNascimento(new Date());
+            // Solicita e associa um novo cliente
+            System.out.println("\n--- Cadastro do Novo Cliente ---");
+            System.out.println("Nome do cliente:");
+            String nomeCliente = scanner.nextLine();
 
+            System.out.println("Email do cliente:");
+            String emailCliente = scanner.nextLine();
+
+            Cliente cliente = new Cliente();
+            cliente.setNome(nomeCliente);
+            cliente.setEmail(emailCliente);
+            cliente.setDataNascimento(new Date()); // Exemplo de data
+
+            // Adiciona a entidade Endereco na lista de endereços do cliente
             cliente.getEnderecos().add(endereco);
+
+            // Define o cliente para o objeto Endereco
             endereco.setClientes(cliente);
 
+            // Grava o novo cliente no banco
             em.persist(cliente);
 
             transaction.commit();
-            System.out.println("Cliente " + cliente.getNome() + " associado com sucesso ao endereço do CEP " + endereco.getCep());
+            System.out.println("\n Cliente '" + cliente.getNome() + "' associado com sucesso ao endereço do CEP " + endereco.getCep() + ".");
 
         } catch (Exception ex) {
             if (transaction.isActive()) {
                 transaction.rollback();
             }
-            System.out.println("Ocorreu um erro na operação: " + ex.getMessage());
+            System.out.println(" Ocorreu um erro na operação: " + ex.getMessage());
+            ex.printStackTrace();
         } finally {
             if (em.isOpen()) {
                 em.close();
             }
             EntityManagerUtil.closeEmf();
+            scanner.close();
         }
     }
 }
